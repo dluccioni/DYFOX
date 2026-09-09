@@ -1,0 +1,44 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the accompanying paper."
+title: "SPC-DFXM: simulation code for spiral phase contrast dark-field X-ray microscopy"
+type: software
+version: 1.1.0
+date-released: 2026-09-09
+license: MIT
+repository-code: "https://github.com/dluccioni/SPC-DFXM"
+abstract: >-
+  GPU-accelerated exact-characteristic Takagi-Taupin and Fourier-optics
+  simulation code for dark-field X-ray microscopy of dislocations, with
+  the scripts that reproduce every figure of "Spiral phase contrast
+  dark-field X-ray microscopy: single-exposure determination of
+  dislocation type and Burgers-vector sign".  The simulation engine is
+  independent of the paper's configuration and can be pointed at another
+  crystal, energy, objective or dislocation arrangement.
+authors:
+  - family-names: Luccioni
+    given-names: Dorian
+    email: dorianpl@stanford.edu
+    affiliation: "Department of Materials Science and Engineering, Stanford University"
+  - family-names: Dresselhaus-Marais
+    given-names: Leora
+    email: leoradm@stanford.edu
+    affiliation: "Department of Materials Science and Engineering, Stanford University; Department of Photon Science, SLAC National Accelerator Laboratory"
+keywords:
+  - dark-field X-ray microscopy
+  - spiral phase contrast
+  - dislocations
+  - Burgers vector
+  - orbital angular momentum
+  - Takagi-Taupin equations
+  - GPU computing
+preferred-citation:
+  type: article
+  title: "Spiral phase contrast dark-field X-ray microscopy: single-exposure determination of dislocation type and Burgers-vector sign"
+  authors:
+    - family-names: Luccioni
+      given-names: Dorian
+    - family-names: Dresselhaus-Marais
+      given-names: Leora
+  journal: "Journal of Applied Crystallography"
+  year: 2026
+  notes: "Submitted."

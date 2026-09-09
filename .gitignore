@@ -1,0 +1,24 @@
+# Everything the pipeline generates.  A cold run reproduces all of it:
+# simulation data, figures, run logs, the exit-wave cache and the
+# diagnostics' scratch.
+output/*
+!output/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+
+# Never commit working copies
+*.bak
+*.bak_*
+*.orig
