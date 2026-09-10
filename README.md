@@ -1,6 +1,6 @@
 # DYFOX (DYnamical diffraction and Fourier Optics X-ray simulator)
 
-Simulation code for spiral phase contrast dark-field X-ray microscopy:
+Simulation code designed for spiral phase contrast dark-field X-ray microscopy:
 dynamical diffraction of a dislocation's exit wave from a strained
 crystal, and the Fourier optics that images it through a spiral phase
 plate.
@@ -8,9 +8,7 @@ plate.
 A dislocation's diffracted exit wave carries orbital angular momentum of
 charge m = -g.b about the core. Put a spiral phase plate of charge
 l = +g.b at the back focal plane of the objective and that vortex is
-filled in, so one exposure fixes the sign of the Burgers vector. The
-code here is what you need to simulate that, or anything else built from
-the same two ingredients.
+filled in, so one exposure fixes the sign of the Burgers vector.
 
 ## Requirements
 
@@ -19,7 +17,9 @@ in FP64. Everything else, the Bragg solver included, is NumPy and runs
 anywhere.
 
 ```
-pip install -r requirements.txt      # pick the cupy-cuda wheel for your CUDA
+pip install numpy scipy
+pip install cupy-cuda12x        # Laue solver only; match your CUDA toolkit
+pip install scikit-image        # optional, for analysis.metrics.ssim_pair
 ```
 
 Nothing to install and no package to build: put the repository root on
@@ -27,7 +27,7 @@ Nothing to install and no package to build: put the repository root on
 
 ```python
 import sys
-sys.path.insert(0, "/path/to/SPC-DFXM")
+sys.path.insert(0, "/path/to/DYFOX")
 ```
 
 ## Describing an experiment
@@ -53,8 +53,8 @@ extinction length. `DIAMOND` ships with it; any other material is a
 `Material` with your own lattice parameter, basis, atomic number,
 Poisson ratio and form factors.
 
-`python info.py --hkl 220 --energy 12.5 --gpu` prints all of it, plus
-what the grid will cost you on the device.
+`xtal.report()` prints the derived numbers, and `print(grid)` gives the
+sampling they imply.
 
 ## The two solvers
 
@@ -81,15 +81,6 @@ preconditioned GMRES, with the same exact-advection depth step. Closed
 forms for a perfect crystal, semi-infinite and finite-thickness Riccati,
 come with it so the grid solver can be checked against something
 independent.
-
-Supporting them: `dislocations.py` for segments and the displacement
-phase they impose, `optics.py` for the imaging stage, `units.py` for
-rocking angle against deviation parameter, `illumination.py` for beams
-that are partially coherent because they are focused or polychromatic,
-`detector.py` for what a pixel array actually records off an obliquely
-viewed exit surface, `analysis/` for the measurements you take off a
-simulated image, and `backend.py` for precision and the one thing that
-has to know whether an array lives on a GPU.
 
 ## A dislocation, start to finish
 
@@ -154,24 +145,25 @@ These matter if you extend it, and each is checked rather than assumed.
    ratio here is the Voigt-Reuss-Hill value 0.069 from C11, C12 and C44,
    not the 0.28 that gets quoted for it.
 
-## What is engine and what is not
+## What is in the repository
 
-The repository root is the engine: `crystal.py`, `laue/`, `bragg/`,
-`dislocations.py`, `optics.py`, `illumination.py`, `detector.py`,
-`units.py`, `analysis/`, `backend.py`. It carries no experiment. There
-is no default crystal, no default energy, no default objective, and
-nothing in it reads a configuration file.
+    crystal.py        materials, and what a reflection at an energy implies
+    units.py          rocking angle against deviation parameter
+    dislocations.py   segments, and the displacement phase they impose
+    laue/             the transmission solver: grid, kernels, cache
+    bragg/            the reflection solver and its closed-form references
+    optics.py         the objective, its pupils and the spiral phase plate
+    illumination.py   beams that are partially coherent, by convergence
+                      or by bandwidth
+    detector.py       what a pixel array records off an obliquely viewed
+                      exit surface
+    analysis/         the measurements you take off a simulated image
+    backend.py        precision, and the one place that knows whether an
+                      array lives on a GPU
 
-`spc_dfxm/` is one application of it: the scripts that reproduce the
-figures of the accompanying paper, together with the crystal, energy,
-aperture and defect scene that paper chose. Nothing at the root imports
-it. `examples/` is four short programs that use the engine for
-something else, and `regression/` is the gate that checks a cold run of
-the paper layer against a stored one, file by file.
-
-If you are here for the simulation code, you want the root and
-`examples/`. If you are here to reproduce a figure, you want
-`spc_dfxm/README.md`.
+This is an engine and it carries no experiment. There is no default
+crystal, no default energy, no default objective, and nothing in it
+reads a configuration file.
 
 ## Citation
 
