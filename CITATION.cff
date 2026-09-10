@@ -2,7 +2,7 @@ cff-version: 1.2.0
 message: "If you use this code, please cite the accompanying paper."
 title: "SPC-DFXM: simulation code for spiral phase contrast dark-field X-ray microscopy"
 type: software
-version: 1.1.0
+version: 1.0.0
 date-released: 2026-09-09
 license: MIT
 repository-code: "https://github.com/dluccioni/SPC-DFXM"
