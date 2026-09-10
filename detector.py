@@ -8,9 +8,10 @@ Two samplings, because the objective views the object plane obliquely:
     area_average   exact area average onto an arbitrary, anisotropic
                    pixel grid, for the general case
 
-Poisson noise is NOT applied here.  The expected-count array is
-`img * dose / reference`, and that expression is not associative, so the
-scripts compute it themselves and keep their own random streams.
+Poisson noise is not applied here. The expected counts are
+`img * dose / reference`, that expression is not associative, and the
+random stream belongs to whoever is drawing from it, so the scripts do
+both parts themselves.
 """
 
 import numpy as np
@@ -33,14 +34,14 @@ def object_pixel_size(pixel_m, magnification):
 
 
 def foreshortened_pixel(pix_obj_um, theta_B, geometry):
-    """Object-plane pitch along x for an obliquely viewed exit surface.
+    """Object-plane pitch along x when the exit surface is viewed obliquely.
 
-    The objective looks along the diffracted beam.  In Laue the exit-face
-    normal is z and k_g is theta_B from it, so x is sampled at
-    pitch / cos(theta_B); in Bragg the diffracted beam leaves at
-    90 - theta_B from the surface normal, so x is sampled at
-    pitch / sin(theta_B) -- 2.4x coarser at 17 keV, which square binning
-    would get wrong.  y is unforeshortened in both.
+    The objective looks along the diffracted beam, so it does not sample
+    the object plane isotropically. In Laue the exit-face normal is z and
+    k_g sits theta_B away from it, giving pitch / cos(theta_B). In Bragg
+    the diffracted beam leaves at 90 - theta_B from the surface normal,
+    giving pitch / sin(theta_B), which at 17 keV is 2.4x coarser. Square
+    binning gets that badly wrong. y is unforeshortened either way.
     """
     if geometry == "Laue":
         return pix_obj_um / np.cos(theta_B)
@@ -50,13 +51,12 @@ def foreshortened_pixel(pix_obj_um, theta_B, geometry):
 
 
 def area_average(img, dx_um, pix_y_um, pix_x_um):
-    """Area-average onto a detector grid of arbitrary pitch.
+    """Area-average onto a detector grid of any pitch.
 
-    Exact for fractional pixel boundaries: integrate the image, then take
-    differences of the bilinearly interpolated integral at the pixel
-    edges.  `dx_um` is the simulation pitch in um and must be passed as
-    the caller computes it, so the arithmetic matches call site for call
-    site.
+    Exact even where the pixel boundaries fall between simulation
+    samples: integrate the image once, then difference the bilinearly
+    interpolated integral at the pixel edges. `dx_um` is the simulation
+    pitch in micrometres.
     """
     n = img.shape[0]
     C = np.zeros((n + 1, n + 1))

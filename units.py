@@ -1,35 +1,28 @@
-"""Rocking angle and deviation parameter.
+"""Rocking angle to deviation parameter.
 
-Three conversions, and they are deliberately three rather than one with a
-scale factor, because floating-point multiplication is not associative:
+Three functions rather than one, because the pipeline does this
+conversion three different ways and the differences survive into the
+figures:
 
-    phi * sin_2tB / lam        !=  phi * (sin_2tB / lam)
-    (urad * 1e-6) * sin_2tB / lam  !=  (urad * sin_2tB / lam) * 1e-6
+    phi * sin_2tB / lam           angle already in radians
+    urad * 1e-6 * sin_2tB / lam   angle in microradians
+    s * lam / sin_2tB * 1e6       going back the other way
 
-for many inputs.  The pipeline uses the first form for angles already in
-radians and the second for angles in microradians, and the published
-figures depend on which one ran.  Each function below reproduces one call
-site's expression exactly; do not fold them together.
-
-    deviation_from_rad     rocking angle in rad     -> s_dev in 1/m
-    deviation_from_urad    rocking angle in urad    -> s_dev in 1/m
-    urad_from_deviation    s_dev in 1/m             -> rocking angle in urad
+Folding sin_2tB / lam into a single constant is the obvious tidy-up and
+it changes roughly half the values on a rocking grid in the last bit,
+because floating-point multiplication is not associative. The published
+figures were made with the forms above, so keep them apart.
 """
 
 import numpy as np
 
-# Physical constants shared by the crystal calculation.
+# Constants the crystal calculation shares.
 R_E = 2.8179403262e-15          # classical electron radius (m)
 HC_EV_M = 12398.419e-10         # hc (eV * m)
 
 
 def param(xtal, key):
-    """Read a crystal parameter from a mapping or from an object.
-
-    The engine moves from a parameter dict to a CrystalParams object in
-    two steps; accepting both keeps every call site written the same way
-    across the move.
-    """
+    """Crystal parameter by name, from a mapping or from an object."""
     try:
         return xtal[key]
     except (TypeError, IndexError, KeyError):
