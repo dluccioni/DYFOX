@@ -81,11 +81,16 @@ def test_sigma_hbar_conjugates_only_the_geometric_sum(diamond400):
 
 
 def test_thickness_in_extinction_lengths(diamond400):
-    """The paper's plate is 5.02 extinction lengths."""
-    from spc_dfxm.paper import config
-    assert config.T_CRYSTAL / diamond400.xi_g == pytest.approx(5.019,
-                                                               abs=0.005)
-    assert config.T_CRYSTAL * 1e6 == pytest.approx(273.404, abs=0.002)
+    """Snapping 270 um to the nearest Pendelloesung maximum gives 273.404 um.
+
+    Half a period is xi_g cos(theta_B), and the snap keeps the plate on
+    a maximum (n = 5, so 5.5 half-periods). The result is 5.019
+    extinction lengths and follows from the crystal numbers alone.
+    """
+    half_pend = diamond400.xi_g * diamond400.cos_tB
+    t_crystal = (round(270e-6 / half_pend - 0.5) + 0.5) * half_pend
+    assert t_crystal * 1e6 == pytest.approx(273.404, abs=0.002)
+    assert t_crystal / diamond400.xi_g == pytest.approx(5.019, abs=0.005)
 
 
 def test_energy_override_keeps_the_reflection(diamond400):

@@ -11,7 +11,7 @@ import pytest
 from analysis.rocking import planewave_rocking
 from backend import FP32, FP64, to_numpy
 from dislocations import (burgers_vector, compute_H_grid, g_dot_b,
-                          straight_segment, volterra_frame)
+                          line_direction, straight_segment, volterra_frame)
 from laue import LaueGrid, solve_dislocation, solve_pristine
 from optics import Optics, apply_pupils
 from units import deviation_from_urad
@@ -307,13 +307,26 @@ def test_the_production_grid_winds_by_two_pi_g_dot_b(gpu, diamond400):
 
     Two and a bit gigabytes of displacement phase, which is the reason
     this one is marked slow rather than run with the rest.
+
+    The grid and the segment are the ones the figures were made at,
+    rebuilt here from the crystal so the test needs nothing outside the
+    engine. y sits half a pixel off centre, which keeps the core off the
+    sampled rows.
     """
-    from spc_dfxm.paper import config
-    grid = LaueGrid(diamond400, t_crystal=config.T_CRYSTAL, dx=config.DX,
-                    beam_width=config.BEAM_WIDTH_Y, beam_thickness=1e-6,
-                    grid_pad=config.GRID_PAD)
+    half_pend = diamond400.xi_g * diamond400.cos_tB
+    t_crystal = (round(270e-6 / half_pend - 0.5) + 0.5) * half_pend
+    grid = LaueGrid(diamond400, t_crystal=t_crystal, dx=0.25e-6,
+                    beam_width=120e-6, beam_thickness=1e-6, grid_pad=30)
     assert grid.shape == (544, 1056) and grid.Nz == 491
-    seg = config.make_segment("Edge", +1, grid, diamond400)
+    xi_line = line_direction(diamond400.U_lab, [1.0, 0.0, 1.0])
+    bv_edge = burgers_vector(diamond400.U_lab, [1.0, 0.0, -1.0],
+                             diamond400.b_mag, +1)
+    z0 = grid.t_crystal / 2.0
+    seg = straight_segment(
+        xi_line, bv_edge,
+        np.array([-z0 * diamond400.tan_tB, grid.dx / 2, z0]),
+        2 * (grid.t_crystal + grid.beam_thickness
+             + 2 * grid.t_crystal * diamond400.tan_tB))
     H = to_numpy(compute_H_grid(seg, grid, diamond400))
     Ny_, Nz_, Nx_ = H.shape
     plane = H[:, :, Nx_ // 2].astype(float)
