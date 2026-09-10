@@ -1,13 +1,12 @@
 """Perfect-crystal answers in closed form, to check the solver against.
 
-Two of them, computed differently on purpose. The semi-infinite
-reflectivity is the stationary point of the Riccati equation and falls
-out of a quadratic; the finite-thickness one integrates that same
-equation numerically with SciPy. Neither shares code or a library with
-the grid solver, so agreement between them and it means something.
+    reflectivity_semi_infinite  stationary point of the Riccati
+                                equation, from a quadratic
+    reflectivity_riccati        that equation integrated to finite
+                                thickness with SciPy
+    darwin_width_urad           width of the total-reflection domain
 
-`darwin_width_urad` gives the width of the total-reflection domain,
-which is the natural angular unit for anything in reflection geometry.
+Neither reflectivity shares code with the grid solver.
 """
 
 import numpy as np
@@ -34,14 +33,9 @@ def reflectivity_riccati(s_dev, t_crystal, xtal, rtol=1e-11,
                          atol=1e-14):
     """Finite-thickness reference: integrate the Riccati ODE with scipy.
 
-    Independent of the grid solver in both discretisation and library,
-    which is what makes agreement between them worth anything.
-
-    The equation is quadratic in R, so far out in the tails an adaptive
-    integrator will probe a step where R runs away before rejecting it.
-    Those probes overflow harmlessly and the accepted steps are
-    unaffected, so the warnings they raise are suppressed rather than
-    shown to the caller as if something had gone wrong.
+    Overflow warnings from the integrator's rejected trial steps are
+    suppressed; accepted steps, and every returned value, are
+    unaffected.
     """
     from scipy.integrate import solve_ivp
     s0, sh, sb = complex(xtal.sig0), complex(xtal.sig_h), complex(xtal.sig_hbar)

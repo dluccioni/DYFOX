@@ -1,17 +1,11 @@
 """From a simulated image to what a pixel detector records.
 
-Two samplings, because the objective views the object plane obliquely:
+    bin_pixels           square binning by an integer factor
+    area_average         exact area average onto any anisotropic grid
+    object_pixel_size    detector pitch referred to the object plane
+    foreshortened_pixel  the same, along the foreshortened axis
 
-    bin_pixels     square binning, when the detector pitch is an exact
-                   multiple of the simulation grid (the paper's 3x3 of
-                   0.25 um -> 0.75 um)
-    area_average   exact area average onto an arbitrary, anisotropic
-                   pixel grid, for the general case
-
-Poisson noise is not applied here. The expected counts are
-`img * dose / reference`, that expression is not associative, and the
-random stream belongs to whoever is drawing from it, so the scripts do
-both parts themselves.
+Poisson noise is applied by the caller, not here.
 """
 
 import numpy as np
@@ -36,12 +30,8 @@ def object_pixel_size(pixel_m, magnification):
 def foreshortened_pixel(pix_obj_um, theta_B, geometry):
     """Object-plane pitch along x when the exit surface is viewed obliquely.
 
-    The objective looks along the diffracted beam, so it does not sample
-    the object plane isotropically. In Laue the exit-face normal is z and
-    k_g sits theta_B away from it, giving pitch / cos(theta_B). In Bragg
-    the diffracted beam leaves at 90 - theta_B from the surface normal,
-    giving pitch / sin(theta_B), which at 17 keV is 2.4x coarser. Square
-    binning gets that badly wrong. y is unforeshortened either way.
+    Laue gives pitch / cos(theta_B), Bragg pitch / sin(theta_B). y is
+    unforeshortened in both.
     """
     if geometry == "Laue":
         return pix_obj_um / np.cos(theta_B)
@@ -53,10 +43,10 @@ def foreshortened_pixel(pix_obj_um, theta_B, geometry):
 def area_average(img, dx_um, pix_y_um, pix_x_um):
     """Area-average onto a detector grid of any pitch.
 
-    Exact even where the pixel boundaries fall between simulation
-    samples: integrate the image once, then difference the bilinearly
-    interpolated integral at the pixel edges. `dx_um` is the simulation
-    pitch in micrometres.
+    Integrates the image once, then differences the bilinearly
+    interpolated integral at the pixel edges, so pixel boundaries need
+    not fall on simulation samples. `dx_um` is the simulation pitch in
+    micrometres.
     """
     n = img.shape[0]
     C = np.zeros((n + 1, n + 1))

@@ -1,36 +1,23 @@
 """Solving the Bragg boundary-value problem.
 
-Three routines, and which one to use is not a matter of taste:
+    solve_surface_batch  every y-plane of a chunk in one GMRES
+    solve_bragg_stable   one plane at a time, by the same method
+    solve_bragg          fixed-point iteration, convergent only on thin
+                         crystals
 
-    solve_surface_batch  what to actually call. Solves every y-plane of
-                         a chunk in one GMRES.
-    solve_bragg_stable   one plane at a time. The same method, simpler
-                         to read, and what the batched version was
-                         checked against.
-    solve_bragg          fixed-point iteration. Diverges for any crystal
-                         thick enough to be interesting, and is kept
-                         only as an independent reference on thin ones.
+The shooting form marches both amplitudes down from the surface with
+D_g(0) = v unknown. The back-face condition D_g(t) = 0 then gives a
+linear system A v = -d, where A v is the homogeneous response and d the
+particular one, preconditioned by the perfect crystal's closed-form
+Fourier symbol.
 
-Why the fixed point fails is worth knowing, because it is the reason
-this file is more complicated than the Laue solver. Marching D_0 down
-and D_g back up in turn is Richardson iteration on (I - M)v = c, and it
-converges only while the round-trip operator's spectral radius stays
-under one. That holds until the crystal approaches total reflection,
-which here is about 10 um, and a converged Bragg reflection needs more
-like 30. But the problem is linear, so the answer is to stop iterating
-and solve it.
+`solve_surface_batch` measures the true residual of each chunk and, above
+`accept`, retries it warm-started with a larger Krylov space, then by
+splitting the chunk in half. `info` reports `converged`, `residual`,
+`retries` and `splits`.
 
-The shooting form: march both amplitudes down from the surface with
-D_g(0) = v unknown. The back-face condition D_g(t) = 0 is then a linear
-system A v = -d, where A v is the homogeneous response and d the
-particular one, and GMRES does not care about the spectral radius. The
-perfect crystal has a closed-form Fourier symbol, which makes an
-excellent preconditioner for the strained problem.
-
-One subtlety: the lateral roll is periodic rather than truncated.
-Zeroing the wrapped column seeds an edge that walks Nz pixels inward and
-eats the field of view, so the grid is padded instead. See
-`BraggConfig.Nx`.
+The lateral roll is periodic; the grid is padded rather than truncated.
+See `BraggConfig.Nx`.
 """
 
 import numpy as np

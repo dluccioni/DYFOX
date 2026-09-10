@@ -1,38 +1,19 @@
 """The imaging stage: an objective, a pupil, and a spiral phase plate.
 
-An `Optics` is a lens. It knows its numerical aperture, its focal
-length, and which crystal it is looking at, and it hands out pupils.
+An `Optics` holds a numerical aperture, a focal length and a crystal,
+and hands out pupils.
 
     lens = Optics(NA=1e-4, f_lens=0.274, xtal=xtal)
     open_img = lens.image(stack, dx, ell=0)
     spiral = lens.image(stack, dx, ell=+2)
 
-The physics of the plate is the reason this file exists. A dislocation's
-diffracted exit wave carries a phase vortex of charge m* = -g.b about
-the core. Put a spiral plate of charge l = +g.b in the back focal plane
-and it cancels that winding, so the vortex fills in and the core goes
-bright. Reverse the Burgers vector and the same plate doubles the
-winding instead, so the core stays dark. One exposure, and the sign of b
-is written on the image.
+A pupil of charge `ell` carries a spiral phase exp(i ell phi) inside the
+NA disc. Metres in the back focal plane map to spatial frequencies
+through x_bfp = lambda f fx, which is where `f_lens` enters.
 
-Three things about the pupil are worth stating, because they are easy to
-get wrong and hard to notice:
-
-* The frequency bin holding the singularity must be zeroed for a centred
-  plate. Averaged across that bin the spiral factor is zero, whereas
-  arctan2(0, 0) evaluates to 0 and would pass the object's mean field
-  straight through, undiffracted. But that only holds when the plate is
-  actually centred: displace it and the bin is an ordinary one.
-* Displacing the plate moves the singularity and leaves the aperture
-  where it is, because a real plate's clear aperture is far larger than
-  the NA disc.
-* A chromatic offset moves both together, because there the whole
-  diffracted spectrum has walked in a fixed back focal plane.
-
-Metres in the back focal plane become spatial frequencies through
-x_bfp = lambda f fx, which is where `f_lens` enters. Nothing else in the
-imaging depends on it; magnification and arm lengths describe the
-instrument but not the calculation.
+The module-level `object_spectrum`, `image_from_spectrum`,
+`apply_pupils` and `image_intensity` are the imaging primitives the
+methods are built from.
 """
 
 import numpy as np
@@ -52,12 +33,8 @@ def _modules(xp, precision):
 class Optics:
     """An objective of given numerical aperture, viewing a given crystal.
 
-    `xp` selects the array library: CuPy by default, NumPy if you pass
-    it, which is what the Bragg scripts want since their fields are
-    small enough that a GPU is not worth the trip.
-
-    Pupils are cached on every argument that shapes them, so repeated
-    calls in a loop cost one dictionary lookup.
+    `xp` picks the array library, CuPy by default. Pupils are cached on
+    every argument that shapes them.
     """
 
     def __init__(self, NA, f_lens, xtal, *, precision=FP64, xp=None):
@@ -82,24 +59,17 @@ class Optics:
               cache=True):
         """The pupil on the fftshifted frequency grid.
 
-        `aperture_f` and `singularity_f` are offsets in spatial
-        frequency, of the aperture stop and of the spiral singularity
-        respectively. `levels` quantises the spiral phase into that many
-        steps, which is what a real etched plate gives you.
+        `aperture_f` and `singularity_f` are frequency offsets of the
+        aperture stop and the spiral singularity. `levels` quantises the
+        spiral phase into that many steps.
 
-        `dc_zero` decides what happens to the bin at the origin:
+        `dc_zero` decides the bin at the origin:
 
             "exact"    zero it when the singularity is exactly centred
-            "half_bin" zero it when the singularity is within half a bin
+            "half_bin" zero it when within half a bin
             "never"    leave it alone
 
-        The three exist because the three callers genuinely need
-        different rules, not because one of them is wrong.
-
-        Pass `cache=False` when sweeping thousands of distinct offsets.
-        A full-size pupil is about 9 MB on the device, so a scan over a
-        few thousand energies will exhaust a large GPU if every one of
-        them is kept.
+        `cache=False` skips the pupil cache.
         """
         xp, real_t, cplx_t = _modules(self.xp, self.precision)
         ax, ay = float(aperture_f[0]), float(aperture_f[1])
@@ -151,9 +121,7 @@ class Optics:
                cache=True):
         """Pupil with the plate displaced by `offset_bfp` metres.
 
-        The aperture stays put; only the singularity moves. That is what
-        a misaligned plate does, since its clear aperture is much larger
-        than the NA disc.
+        Moves the singularity; the aperture stays put.
         """
         dfx = offset_bfp[0] / (self.xtal.lam * self.f_lens)
         dfy = offset_bfp[1] / (self.xtal.lam * self.f_lens)
@@ -164,15 +132,9 @@ class Optics:
                   dc_zero="never", cache=True):
         """Pupil seen by photons at a relative energy offset delta_E.
 
-        At fixed incidence the diffracted carrier walks by
-        sin(2 theta_B) delta_E, so in a fixed back focal plane the whole
-        spectrum slides by that over lambda. Working in the gauge where
-        the spectrum stays put, the aperture and the singularity slide
-        instead, together.
-
-        This is the worst case, undispersed illumination: energies whose
-        walk exceeds the NA disc vignette away entirely, so the lens
-        ends up acting as its own bandwidth filter of order 1e-4.
+        Aperture and singularity both slide by
+        sin(2 theta_B) delta_E / lambda. Energies whose walk exceeds the
+        NA disc vignette away entirely.
         """
         dfx = self.xtal.sin_2tB * delta_E / self.xtal.lam
         return self.pupil(Nx, Ny, dx, ell, aperture_f=(dfx, 0.0),
@@ -228,9 +190,7 @@ def image_from_spectrum(spec, pupil):
 def apply_pupils(field, pupils):
     """One exit wave through many pupils, sharing a single forward transform.
 
-    The transform is the expensive half, so this is what to use when
-    comparing an open aperture against several plate charges. Returns
-    (n_pupils, Ny, Nx).
+    Returns (n_pupils, Ny, Nx).
     """
     xp = array_module(field)
     spec = object_spectrum(field)

@@ -1,17 +1,11 @@
-"""Beams that are not a single coherent plane wave.
+"""Sampling a beam that is not a single coherent plane wave.
 
-You cannot focus a beam and collimate it at the same time. A sheet of
-thickness w carries an angular spread of at least lambda / w, which for
-a 1 um sheet at 17 keV is 73 urad: twenty Bragg Darwin widths, or eighty
-Laue ones. A real condenser is wider still. So the beam is a partially
-coherent pile of tilted modes, and the way to handle it is an incoherent
-sum over incidence angle.
-
-`condenser_angles` samples that spread for a focused beam.
-`gauss_hermite_offsets` does the same for an extended source, in two
-dimensions. `convergence_bandwidth_nodes` adds the energy band, which
-is not independent of the angle: both move the deviation parameter, so
-they have to be sampled together.
+    condenser_angles             incidence angles and weights for a
+                                 focused beam
+    gauss_hermite_offsets        n*n offsets and weights for a Gaussian
+                                 source
+    convergence_bandwidth_nodes  joint quadrature over incidence angle
+                                 and energy band
 """
 
 import numpy as np
@@ -22,17 +16,8 @@ from units import param
 def condenser_angles(w_D, reach=75.0):
     """Incidence angles for an incoherent condenser sum, and their weights.
 
-    Dense across the Darwin width, coarse out in the wings. Checked on
-    the Laue side against a 0.2 w_D reference, which is cheap enough to
-    compute:
-
-        fine step   N    max |dI| / Imax
-        0.5 w_D     48       8.3e-05
-        1.0 w_D     21       1.8e-02      <- what we use
-        2.0 w_D     11       7.8e-02      too coarse
-
-    At 1.0 w_D the sampling error sits an order of magnitude under the
-    shot noise of a 300-count exposure, so no recorded image can see it.
+    Sampled every w_D across +-4 w_D, then every 5 units out to `reach`.
+    Weights are the node spacing.
     """
     fine = np.arange(-4.0 * w_D, 4.0 * w_D + 1e-9, w_D)
     coarse = np.arange(-reach, reach + 1e-9, 5.0)
@@ -43,10 +28,7 @@ def condenser_angles(w_D, reach=75.0):
 def gauss_hermite_offsets(sigma, n=8):
     """Nodes and weights for averaging over a Gaussian source of rms sigma.
 
-    n*n offsets, and weights that sum to one. This is the average an
-    extended incoherent source really produces. Sampling a few rings by
-    hand instead drops the polar Jacobian and leaves far too much weight
-    sitting on the unblurred centre.
+    Returns n*n offsets and weights summing to one.
     """
     x, w = np.polynomial.hermite_e.hermegauss(n)
     X, Y = np.meshgrid(x, x)
@@ -61,24 +43,15 @@ def convergence_bandwidth_nodes(xtal, sig_psi, sig_delta, n_psi, psi_max,
                                 vignette_f=None):
     """Quadrature nodes over a beam's angular spread and its energy band.
 
-    A real beam is spread in both at once, and the two are not
-    independent: an incidence angle psi and a relative energy offset
-    delta reach the same deviation parameter along the line
-    psi + tan(theta_B) delta = const. So the grid is over both, and the
-    weights are the product of two Gaussians.
+    An n_psi x n_delta grid with Gaussian weights of width `sig_psi` and
+    `sig_delta`. `matched="psi"` tilts each energy back onto the Bragg
+    condition; `matched="delta"` ties the angular spread entirely to the
+    band. `vignette_f` drops nodes whose chromatic carrier lies outside
+    the objective, leaving their weight out of the normalisation.
 
-    `matched` describes an instrument that deliberately correlates them.
-    "psi" is a dispersing optic that tilts each energy back onto the
-    Bragg condition; "delta" is the degenerate case where the angular
-    spread is entirely the band's doing. Neither is the default.
-
-    `vignette_f` drops nodes whose chromatic carrier has walked outside
-    the objective before anything is solved. Their weight stays out of
-    the normalisation, which is right: that light really is lost.
-
-    Returns the deviation parameters, the chromatic arguments and the
-    weights, sorted from the Bragg condition outward, plus a dict
-    describing what was dropped.
+    Returns deviation parameters, chromatic arguments and weights,
+    sorted from the Bragg condition outward, plus a dict recording how
+    many nodes were kept.
     """
     lam = param(xtal, "lam")
     theta_B = param(xtal, "theta_B")

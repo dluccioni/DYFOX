@@ -1,21 +1,14 @@
-"""Keeping solved exit waves on disk so separate runs can share them.
+"""Exit waves stored on disk, keyed by the inputs that produced them.
 
-A solve is expensive and completely determined by its inputs, so the
-answer is worth writing down. Point a cache at a directory and ask it
-for a solve; it hashes everything that went in and either loads the
-answer or computes and stores it.
+`WaveCache.solve` hashes the segments, deviation parameters, grid,
+crystal and precision, then either loads the stored answer or computes
+and stores it.
 
     waves = WaveCache("output/data/waves")
     stack = waves.solve(segs, s_dev, grid, xtal, tag="edge_+1")
 
-One thing to know before trusting a result: the cache stores complex64
-to keep the files a sensible size, while a fresh solve in FP64 hands
-back complex128. So a cache hit is not bit-identical to a miss, and
-which of the two you got is part of your numbers. If that matters for
-what you are doing, and for reproducing a published figure it does,
-start from an empty directory and let every run take the same path
-through it. Passing `store_dtype=np.complex128` removes the asymmetry
-at four times the disk.
+Files are written as complex64 unless `store_dtype` says otherwise, so
+a cache hit is not bit-identical to a fresh FP64 solve.
 """
 
 import hashlib

@@ -1,22 +1,15 @@
 """Geometry for symmetric Bragg: the grid, and dislocations to put in it.
 
-Reflection differs from transmission in more than a sign. The
-diffracting planes lie parallel to the surface, so g runs along the
-surface normal, and the two characteristics walk the same way laterally
+The diffracting planes lie parallel to the surface, so g runs along the
+surface normal and the two characteristics share a lateral direction
 while running opposite ways in depth:
 
     s_0 = ( cos t_B, 0,  sin t_B)      into the crystal
     s_g = ( cos t_B, 0, -sin t_B)      back out
 
-The depth step follows the same exact-advection rule as the Laue side,
-here dz = dx tan(theta_B), so lateral transport is one pixel per step
-and again an index shift rather than an interpolation.
-
-`bragg_g_vector` is worth calling rather than reusing a crystal's Laue
-`g_vec`. That vector lies in the surface, while a dislocation threading
-that surface has its Burgers vector out of it, so the two are
-perpendicular and g.b comes out at zero. The defect would simply not
-appear.
+The depth step is dz = dx tan(theta_B), one pixel of lateral transport
+per step. `bragg_g_vector` returns g along the surface normal;
+`threading_segment` and `edge_segment` build dislocations to put in it.
 """
 
 import numpy as np

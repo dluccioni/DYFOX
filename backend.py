@@ -1,25 +1,13 @@
-"""Talking to whichever array library the caller happens to be using.
+"""Array-library helpers, and the two floating-point precisions.
 
-The Laue solver runs on CuPy. Everything else works the same on CuPy or
-NumPy arrays, so instead of each module working out for itself how to
-get a host copy, they ask here.
+`cupy`, `to_numpy`, `array_module` and `free_gpu` cover the difference
+between CuPy and NumPy arrays. `FP64` and `FP32` carry their dtypes and
+the CUDA kernels compiled for them, and are passed to the solvers:
 
-This is also where precision lives. `FP64` and `FP32` are the two
-objects the solvers take; each knows its dtypes and holds the kernels
-compiled for it. Pass one around rather than setting a global:
-
-    from backend import FP64, FP32
     waves = solve_dislocation(segs, s_dev, grid, xtal, precision=FP32)
 
-FP64 is the right default. On an RTX 4090 the march costs about 0.15 s
-per rocking angle in double against 0.01 s in single, which is nothing
-beside building the displacement grid, and single leaves a 5 % noise
-floor in the spiral-suppressed background that the centre-of-mass ratio
-maps are measured against. FP32 is for drafts.
-
-Nothing in this file imports CuPy at module level, and it needs to stay
-that way: it has to be importable on a machine with no CUDA at all,
-which is what makes the rest of the engine useful there.
+FP64 is the default. Nothing in this module imports CuPy at module
+level.
 """
 
 import numpy as np
@@ -28,12 +16,7 @@ BLOCK = 256          # CUDA threads per block, one per x-column
 
 
 def cupy():
-    """The CuPy module, or a readable error if it is not installed.
-
-    Import this way rather than at the top of a file. Half the engine
-    runs on a laptop, and only the code that actually launches a kernel
-    should be the code that insists on a GPU.
-    """
+    """The CuPy module, or an ImportError naming what to install."""
     try:
         import cupy
     except ImportError as exc:
@@ -56,12 +39,7 @@ def array_module(a):
 
 
 def free_gpu():
-    """Hand CuPy's memory pool back, if CuPy is even loaded.
-
-    One solve holds a displacement-phase grid of a few gigabytes, so the
-    scripts drop the pool between configurations. Does nothing when
-    there is no GPU in play.
-    """
+    """Release CuPy's memory pool. Does nothing if CuPy is not loaded."""
     import sys
     cp = sys.modules.get("cupy")
     if cp is not None:
@@ -71,14 +49,10 @@ def free_gpu():
 class Precision:
     """One floating-point precision, and the kernels built for it.
 
-    `real` and `complex` are the NumPy dtypes; `cp_real` and `cp_complex`
-    the CuPy ones, fetched on demand so that naming a precision does not
-    require a GPU. `scalar(x)` casts a Python float on its way into a
-    kernel argument list.
-
-    There are exactly two instances, `FP64` and `FP32`. Construct no
-    others: kernels are memoised per instance, so a third would compile
-    the same code again.
+    `real`/`complex` are the NumPy dtypes, `cp_real`/`cp_complex` the
+    CuPy ones, fetched on demand. `scalar(x)` casts a float for a kernel
+    argument list. Kernels are memoised per instance. Two instances
+    exist: `FP64` and `FP32`.
     """
 
     def __init__(self, name):
@@ -104,11 +78,7 @@ class Precision:
         return self.real(x)
 
     def kernel(self, name):
-        """The named CUDA kernel, compiled for this precision and kept.
-
-        Compiling is a second or two, so it happens on first use and not
-        at import.
-        """
+        """The named CUDA kernel for this precision, compiled on first use."""
         if name not in self._kernels:
             from laue import kernels
             self._kernels[name] = kernels.build(name, self)
@@ -123,7 +93,7 @@ FP32 = Precision("fp32")
 
 
 def precision(name):
-    """FP64 or FP32 by name, for turning a command-line flag into an object."""
+    """FP64 or FP32 by name, for turning a flag into an object."""
     if isinstance(name, Precision):
         return name
     return FP32 if str(name).lower() in ("fp32", "32", "single") else FP64

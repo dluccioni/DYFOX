@@ -1,28 +1,21 @@
 """Rocking angle to deviation parameter.
 
-Three functions rather than one, because the pipeline does this
-conversion three different ways and the differences survive into the
-figures:
+    deviation_from_rad    angle in radians      phi * sin_2tB / lam
+    deviation_from_urad   angle in microradians urad * 1e-6 * sin_2tB / lam
+    urad_from_deviation   the inverse           s * lam / sin_2tB * 1e6
 
-    phi * sin_2tB / lam           angle already in radians
-    urad * 1e-6 * sin_2tB / lam   angle in microradians
-    s * lam / sin_2tB * 1e6       going back the other way
-
-Folding sin_2tB / lam into a single constant is the obvious tidy-up and
-it changes roughly half the values on a rocking grid in the last bit,
-because floating-point multiplication is not associative. The published
-figures were made with the forms above, so keep them apart.
+The three expressions are kept separate.
 """
 
 import numpy as np
 
-# Constants the crystal calculation shares.
+# Shared with the crystal calculation.
 R_E = 2.8179403262e-15          # classical electron radius (m)
 HC_EV_M = 12398.419e-10         # hc (eV * m)
 
 
 def param(xtal, key):
-    """Crystal parameter by name, from a mapping or from an object."""
+    """Crystal parameter by name, from a mapping or an object."""
     try:
         return xtal[key]
     except (TypeError, IndexError, KeyError):

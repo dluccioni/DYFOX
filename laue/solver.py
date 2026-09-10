@@ -1,25 +1,18 @@
 """The transmission (Laue) solver.
 
-Both amplitudes travel into the crystal and out the far face, so this is
-an initial-value problem: start at the entrance surface and march to the
-exit. That is what makes Laue cheap compared to reflection, where the
-diffracted beam comes back out the way it went in and the problem
-becomes a boundary-value one.
-
-What comes back is the physical exit wave, not an envelope. The
-displacement phase is folded into the off-diagonal couplings as
-exp(-+iH) inside the kernel, so there is no envelope approximation and
-no phase to restore afterwards.
-
     stack = solve_dislocation(segs, s_dev, grid, xtal)
+    stack = solve_pristine(s_dev, grid, xtal)
 
-`s_dev` may be an array, and then one launch gives you a whole rocking
-scan sharing a single displacement grid. Building that grid is what a
-solve mostly costs, so scanning this way rather than in a Python loop is
-worth roughly the length of the scan.
+Marches both amplitudes from the entrance surface to the exit face. The
+displacement phase enters the off-diagonal couplings as exp(-+iH) inside
+the kernel, so what comes back is the physical exit wave rather than an
+envelope.
 
-Everything returned is a CuPy array of shape (n_angles, Ny, Nx). Call
-`backend.to_numpy` at the point where you want it back on the host.
+`s_dev` may be an array, in which case one launch covers a whole rocking
+scan sharing a single displacement grid.
+
+Returns a CuPy array of shape (n_angles, Ny, Nx). Call
+`backend.to_numpy` for a host copy.
 """
 
 import numpy as np
@@ -42,14 +35,9 @@ def solve_dislocation(seg_list, s_dev_arr, grid, xtal, *, H_gpu=None,
                       batch=64, precision=FP64):
     """Exit wave of a dislocation field, at each deviation parameter given.
 
-    Pass `H_gpu` to reuse a displacement grid you already built, which
-    is what to do when the same dislocations are solved at several
-    angles or thicknesses.
-
-    Geometries that are a single straight line along x_lab take the
-    closed-form path instead, evaluating the phase inside the kernel
-    with no grid at all. Nothing in the paper's geometry qualifies; the
-    path exists so the two can be checked against each other.
+    Pass `H_gpu` to reuse a displacement grid already built. A single
+    line along x_lab takes the closed-form kernel path instead, with no
+    grid stored. `batch` sets how many angles are launched at once.
     """
     cp = cupy()
     DTYPE = precision.scalar
@@ -106,8 +94,7 @@ def solve_dislocation(seg_list, s_dev_arr, grid, xtal, *, H_gpu=None,
 def solve_pristine(s_dev_arr, grid, xtal, *, precision=FP64):
     """Exit wave of a perfect crystal, at each deviation parameter given.
 
-    The rocking curve of this is the reference every strained solve is
-    read against, and it has a closed form to check it with. See
+    The closed form for the same curve is
     `analysis.rocking.planewave_rocking`.
     """
     DTYPE = precision.scalar

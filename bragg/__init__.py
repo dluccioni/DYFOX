@@ -6,21 +6,18 @@
     cfg = BraggConfig(xtal, t_crystal=30e-6, dx=0.05e-6)
     surface, info = solve_surface_batch(segs, s_dev, cfg, ys, xtal, g)
 
-This is a different problem from the transmission case, not a variant of
-it. The diffracted beam leaves through the entrance surface, so
+The diffracted beam leaves through the entrance surface, so the
+boundary conditions are two-point:
 
     D_0(z = 0) = incident        at the front
     D_g(z = t) = 0               nothing enters from the back
 
-is a two-point boundary-value problem, and no single march solves it.
-See `bragg.solver` for what does.
+See `bragg.solver` for how they are solved.
 
-Everything here runs in NumPy. Pass CuPy if you have it and the grid is
-large enough to pay for the trip, but nothing requires it, and importing
-this package never touches a GPU.
+Everything here runs in NumPy. Pass CuPy to use a GPU; importing this
+package never touches one.
 
-Conventions are the same as the transmission side, deliberately, so that
-a sign slip cannot quietly flip a Burgers-vector assignment:
+Conventions match the transmission side:
 
     dD/ds = sigma D,  sigma = -i r_e lambda F / V_cell
     couplings carry sigma_h e^{-iH} and sigma_hbar e^{+iH},  H = 2 pi g.u

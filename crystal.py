@@ -1,19 +1,13 @@
-"""What the crystal is, and what that means for a given reflection.
+"""Materials, and the diffraction parameters a reflection implies.
 
-Two objects. A `Material` is a substance: lattice parameter, basis,
-atomic number, Poisson ratio, and the atomic form factor at the
-reflections you care about. It knows nothing about a beam.
+A `Material` is a substance: lattice parameter, basis, atomic number,
+Poisson ratio, form factors. `CrystalParams` is a material plus a
+reflection plus a photon energy, and carries the wavelength, Bragg
+angle, susceptibility couplings and extinction length the solvers use.
 
-`CrystalParams` is a material plus a reflection plus a photon energy,
-which is enough to fix everything the solvers need: the wavelength, the
-Bragg angle, the three susceptibility couplings, the extinction length.
-Build one and hand it around; nothing downstream keeps its own copy.
-
-    from crystal import DIAMOND, CrystalParams
     xtal = CrystalParams.from_reflection(DIAMOND, (4, 0, 0), 17.0)
 
-The formulae assume a cubic lattice and a symmetric geometry, which is
-what the solvers here implement.
+The formulae assume a cubic lattice and a symmetric geometry.
 """
 
 from dataclasses import dataclass, replace
@@ -32,14 +26,10 @@ DIAMOND_CUBIC = np.array([[0, 0, 0], [.5, .5, 0], [.5, 0, .5], [0, .5, .5],
 class Material:
     """A substance, independent of any beam or reflection.
 
-    `f0` holds the Cromer-Mann atomic form factor at each reflection you
-    intend to use, keyed by (h, k, l); it depends only on sin(theta)/lambda,
-    so it belongs to the material rather than to the experiment.
-
-    `burgers_mag` defaults to the 1/2<110> Burgers vector of the
-    face-centred cubic and diamond-cubic lattices. `core_radius` is where
-    the Volterra displacement field gets regularised, conventionally one
-    Burgers vector.
+    `f0` holds the Cromer-Mann form factor per reflection, keyed by
+    (h, k, l). `burgers_mag` defaults to the 1/2<110> Burgers vector of
+    fcc and diamond-cubic; `core_radius`, where the Volterra field is
+    regularised, defaults to one Burgers vector.
     """
 
     name: str
@@ -61,11 +51,8 @@ class Material:
             else self.burgers()
 
 
-# Poisson ratio is the Voigt-Reuss-Hill value from C11 = 1079,
-# C12 = 124, C44 = 578 GPa.  It is worth being explicit about, because
-# 0.28 gets quoted for diamond and is not a diamond value: the
-# topological winding does not care, but the smooth edge terms carry
-# 1/(1-nu) and (1-2nu)/(4(1-nu)) and move by about 30 %.
+# nu is the Voigt-Reuss-Hill value from C11 = 1079, C12 = 124,
+# C44 = 578 GPa.
 DIAMOND = Material(
     name="diamond",
     a_lat=3.567e-10,
@@ -79,9 +66,8 @@ DIAMOND = Material(
 def lab_frame(normal_hkl, g_hkl):
     """Rows x, y, z of a lab frame with z along `normal_hkl`, x along g.
 
-    A symmetric geometry needs g in the surface for Laue, or along the
-    normal for Bragg. This builds the first: z is the surface normal, x
-    is g projected into the surface, y completes a right-handed set.
+    z is the surface normal, x is g projected into the surface, y
+    completes a right-handed set. Raises if g is parallel to z.
     """
     z = np.asarray(normal_hkl, float)
     z = z / np.linalg.norm(z)
@@ -99,9 +85,9 @@ def lab_frame(normal_hkl, g_hkl):
 class CrystalParams:
     """A material, a reflection and an energy, worked through.
 
-    Attribute names are the ones the solvers use throughout: `lam`,
-    `theta_B`, `sig0`, `sig_h`, `sig_hbar`, `xi_g`, and the trigonometric
-    shorthands `sin_tB`, `cos_tB`, `tan_tB`, `sin_2tB`.
+    Attribute names are the ones the solvers use: `lam`, `theta_B`,
+    `sig0`, `sig_h`, `sig_hbar`, `xi_g`, and the trig shorthands
+    `sin_tB`, `cos_tB`, `tan_tB`, `sin_2tB`.
     """
 
     material: Material
@@ -130,16 +116,11 @@ class CrystalParams:
     @classmethod
     def from_reflection(cls, material, hkl, E_keV, U_lab=None, f0=None,
                         f_prime=0.0, f_dprime=0.0, label=None):
-        """Work out the diffraction parameters for one reflection.
+        """Diffraction parameters for one reflection at one energy.
 
-        `f_prime` and `f_dprime` are the anomalous corrections at this
-        energy; they are yours to supply, since they depend on it and no
-        table ships with this code. Their sign convention is fixed by
-        the solver: it evolves D ~ exp(sigma s) with sigma = -i C F, so
-        absorption, meaning Re(sigma) < 0, needs Im(F) < 0. Hence the
-        minus in `f + f' - i f''`. Getting this backwards makes the
-        crystal amplify, by about 1.8 % over a 245 um path in diamond,
-        which is easy to miss.
+        `f_prime` and `f_dprime` are the anomalous corrections, supplied
+        by the caller and entering as `f + f' - i f''`. `U_lab` sets the
+        lab frame, `f0` overrides the material's tabulated value.
         """
         hkl = tuple(int(v) for v in hkl)
         g_hkl = np.array(hkl)
@@ -160,18 +141,13 @@ class CrystalParams:
         theta_B = np.arcsin(lam / (2 * d_hkl))
         g_vec = U_lab @ (g_hkl / a_lat)      # lab frame, 1/m, no 2 pi
         V_cell = a_lat ** 3
-        # Forward scattering is f(0) = Z + f' - i f'', not the
-        # reflection's f0(q).  Using f0(q) here understates refraction;
-        # absorption, which f'' sets, is unaffected either way.
+        # Forward scattering factor f(0), not the reflection's f0(q).
         f_forward = material.Z + f_prime - 1j * f_dprime
         F_0 = f_forward * len(material.basis)
         S_g = np.sum(np.exp(2j * np.pi * material.basis @ g_hkl))
         F_g = f_atom * S_g
-        # F_{-g} = f conj(S_g).  Only the geometric sum conjugates; the
-        # complex atomic factor does not.  Conjugating the whole thing
-        # would make sigma_h sigma_hbar exactly real, which quietly
-        # makes the open-aperture centre-of-mass antisymmetry exact
-        # instead of exact to the anomalous-absorption terms.
+        # F_{-g} = f conj(S_g): the geometric sum conjugates, the
+        # atomic factor does not.
         F_mg = f_atom * np.conj(S_g)
         sig0 = -1j * R_E * lam * F_0 / V_cell
         sig_h = -1j * R_E * lam * F_g / V_cell
@@ -197,8 +173,7 @@ class CrystalParams:
     def with_frame(self, U_lab):
         """The same crystal mounted in a different lab frame.
 
-        Only the orientation changes, so g turns with it and everything
-        scalar stays as it was. This is what a geometry study varies.
+        Only `U_lab` and `g_vec` change; the scalars are unchanged.
         """
         U_lab = np.asarray(U_lab, float)
         g_hkl = np.array(self.hkl)

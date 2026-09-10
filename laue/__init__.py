@@ -6,9 +6,8 @@
     stack = solve_dislocation(segs, s_dev, grid, xtal)
 
 `grid` fixes the sampling and the beam, `solver` marches the equations,
-`cache` remembers the answers, and `kernels` holds the CUDA that does
-the work. Importing this package does not touch the GPU; the first
-solve does.
+`cache` stores results, `kernels` holds the CUDA. Importing this package
+does not touch the GPU; the first solve does.
 """
 
 from laue.cache import WaveCache

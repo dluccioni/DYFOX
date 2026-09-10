@@ -1,24 +1,16 @@
-"""The CUDA kernels: three of them, templated on precision.
+"""The three CUDA kernels, templated on precision.
 
 Each source is written once with DTYPE and the maths macros left
-abstract, then instantiated as float or double by `build`. Writing two
-copies by hand would be asking for them to drift apart.
+abstract, then instantiated as float or double by `build`.
 
-    tt3d_fullfield   the production kernel. Takes the displacement phase
-                     from a precomputed 3-D grid, so any number of
-                     dislocations of any shape.
+    tt3d_fullfield   displacement phase from a precomputed 3-D grid,
+                     for any number of segments in any orientation
     tt3d_analytic    the same march with the phase evaluated in-kernel
-                     from a closed form. Only valid for a single
-                     straight line along x_lab, and kept because an
-                     independent path through the same physics is worth
-                     having.
-    tt3d_pristine    no dislocation at all, for rocking curves.
+                     from the closed form, for a single line along x_lab
+    tt3d_pristine    no dislocation, for rocking curves
 
 All three march the Takagi-Taupin equations down the depth axis, one
-thread per x-column, holding the two amplitudes in shared memory. The
-depth step is chosen so a characteristic advances exactly one pixel per
-step, which makes the transport an index shift rather than an
-interpolation. See `laue.grid` for why that matters so much.
+thread per x-column, holding the two amplitudes in shared memory.
 """
 
 from backend import cupy
@@ -380,9 +372,8 @@ def build(name, precision):
 def prepare(kernel, smem):
     """Opt in to the large dynamic shared-memory carveout when needed.
 
-    A block holds four rows of Nx+1 complex amplitudes, so a wide grid
-    in double precision runs past the 48 KB a kernel gets by default.
-    Most CUDA devices will grant up to 99 KB on request.
+    A block holds four rows of Nx+1 complex amplitudes. Above 48 KB the
+    kernel requests the device's opt-in maximum.
     """
     if smem > 48 * 1024:
         cp = cupy()
