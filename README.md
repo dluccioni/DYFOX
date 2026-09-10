@@ -1,4 +1,4 @@
-# SPC-DFXM
+# DYFOX (DYnamical diffraction and Fourier Optics X-ray simulator)
 
 Simulation code for spiral phase contrast dark-field X-ray microscopy:
 dynamical diffraction of a dislocation's exit wave from a strained
